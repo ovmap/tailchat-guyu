@@ -20,6 +20,6 @@
   "dependencies": {
     "lodash": "^4.17.21",
     "nanoid": "^3.1.23",
-    "tailchat-server-sdk": "*"
+    "tailchat-server-sdk": "workspace:*"
   }
 }

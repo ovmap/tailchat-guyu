@@ -9,6 +9,6 @@
   "scripts": {},
   "devDependencies": {},
   "dependencies": {
-    "tailchat-server-sdk": "*"
+    "tailchat-server-sdk": "workspace:*"
   }
 }

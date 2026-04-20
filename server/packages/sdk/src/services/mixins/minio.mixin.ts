@@ -117,8 +117,11 @@ export const TcMinioService = {
      * @returns {PromiseLike<boolean|MinioPingError>}
      */
     ping({ timeout = 5000 } = {}) {
+      // 使用 bucketExists 替代 listBuckets（listBuckets 在某些 MinIO 配置下有兼容性问题）
+      // 默认使用 tailchat bucket 或从 settings.bucketName 获取
+      const bucketName = this.settings.bucketName || 'tailchat';
       return this.Promise.race([
-        this.client.listBuckets().then(() => true),
+        this.client.bucketExists(bucketName).then(() => true),
         this.Promise.delay(timeout).then(() => {
           throw new MinioPingError();
         }),

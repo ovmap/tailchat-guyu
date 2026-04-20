@@ -10,7 +10,7 @@
   "dependencies": {
     "got": "^11.8.3",
     "lodash": "^4.17.21",
-    "tailchat-server-sdk": "*"
+    "tailchat-server-sdk": "workspace:*"
   },
   "devDependencies": {
     "@types/lodash": "^4.14.191"

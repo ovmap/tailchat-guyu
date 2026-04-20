@@ -19,6 +19,6 @@
   },
   "dependencies": {
     "got": "11.8.6",
-    "tailchat-server-sdk": "*"
+    "tailchat-server-sdk": "workspace:*"
   }
 }
