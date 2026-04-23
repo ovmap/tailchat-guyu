@@ -28,6 +28,7 @@
     "gen:openapi": "tailchat-service-openapi-generator"
   },
   "dependencies": {
+    "@fastify/cors": "^8.5.0",
     "@socket.io/admin-ui": "^0.5.1",
     "@socket.io/redis-adapter": "^8.2.1",
     "@typegoose/typegoose": "9.3.1",
@@ -45,6 +46,7 @@
     "ejs": "^3.1.6",
     "es6-error": "^4.1.1",
     "execa": "5",
+    "fastify": "^4.29.1",
     "glob": "^10.3.3",
     "got": "11.8.3",
     "i18next": "^20.3.5",

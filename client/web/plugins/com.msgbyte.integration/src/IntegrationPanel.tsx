@@ -44,29 +44,70 @@ const AppInfoCard = styled.div({
 const IntegrationPanel: React.FC = React.memo(() => {
   const [appId, setAppId] = useState('');
   const [openAppInfo, setOpenAppInfo] = useState<OpenAppInfo | null>(null);
+  const [appType, setAppType] = useState<'openapi' | 'guyu' | null>(null);
   const groupId = useGroupIdContext();
 
   const [{ loading }, handleQueryApp] = useAsyncRequest(async () => {
-    const { data } = await postRequest('/openapi/app/get', {
-      appId,
-    });
+    let found = false;
 
-    if (!data) {
-      showErrorToasts(Translate.notFoundApp);
-      return;
+    // 先尝试查询 OpenAPI 应用
+    try {
+      const { data } = await postRequest('/openapi/app/get', {
+        appId,
+      });
+
+      if (data) {
+        setOpenAppInfo(data);
+        setAppType('openapi');
+        found = true;
+      }
+    } catch (e) {
+      console.log('OpenAPI app not found, trying Guyu app...');
     }
 
-    setOpenAppInfo(data);
+    // 如果 OpenAPI 应用未找到，尝试查询谷雨应用
+    if (!found) {
+      try {
+        const { data } = await postRequest('/guyu.app/get', {
+          appId,
+        });
+
+        if (data) {
+          setOpenAppInfo(data);
+          setAppType('guyu');
+          found = true;
+        }
+      } catch (e) {
+        console.log('Guyu app not found');
+      }
+    }
+
+    if (!found) {
+      showErrorToasts(Translate.notFoundApp);
+      setOpenAppInfo(null);
+      setAppType(null);
+    }
   }, [appId]);
 
   const [{ loading: addBotLoading }, handleAddBotIntoGroup] =
     useAsyncRequest(async () => {
-      await postRequest('/openapi/integration/addBotUser', {
+      if (!appType) {
+        showErrorToasts('未找到应用信息');
+        return;
+      }
+
+      // 根据应用类型调用对应的接口
+      const endpoint =
+        appType === 'guyu'
+          ? '/guyu.integration/addBotUser'
+          : '/openapi/integration/addBotUser';
+
+      await postRequest(endpoint, {
         appId,
         groupId,
       });
       showSuccessToasts();
-    }, [appId]);
+    }, [appId, appType]);
 
   return (
     <div>

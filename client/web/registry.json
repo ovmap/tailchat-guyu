@@ -214,5 +214,16 @@
     "author": "moonrailgun",
     "description": "Add chatgpt into Tailchat",
     "requireRestart": true
+  },
+  {
+    "label": "GuYu",
+    "label.zh-CN": "谷雨配置",
+    "name": "com.openclaw.guyu",
+    "url": "/plugins/com.openclaw.guyu/index.js",
+    "version": "1.0.0",
+    "author": "陆小千",
+    "description": "GuYu - OpenClaw bridge configuration",
+    "description.zh-CN": "谷雨时节 · 古语传情 - OpenClaw 桥接配置",
+    "requireRestart": false
   }
 ]

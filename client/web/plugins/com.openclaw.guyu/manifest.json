@@ -1,0 +1,8 @@
+{
+  "name": "com.openclaw.guyu",
+  "label": "谷雨配置",
+  "url": "/plugins/com.openclaw.guyu/index.js",
+  "version": "1.0.0",
+  "author": "陆小千",
+  "description": "谷雨时节 · 古语传情 - OpenClaw 桥接配置"
+}
