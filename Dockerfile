@@ -1,4 +1,4 @@
-FROM node:18.18.0-alpine
+FROM node:18-alpine
 
 # use with --build-arg VERSION=xxxx
 ARG VERSION
@@ -13,32 +13,24 @@ RUN npm install -g pnpm@8.15.8
 RUN npm install -g tailchat-cli@latest
 
 # Add mc for minio
-RUN wget https://dl.min.io/client/mc/release/linux-amd64/mc -O /usr/local/bin/mc
-RUN chmod +x /usr/local/bin/mc
+# RUN wget https://dl.min.io/client/mc/release/linux-amd64/mc -O /usr/local/bin/mc
+# RUN chmod +x /usr/local/bin/mc
 
-# Install plugins and sdk dependency
-COPY ./tsconfig.json ./tsconfig.json
-COPY ./packages ./packages
-COPY ./server/packages ./server/packages
-COPY ./server/plugins ./server/plugins
-COPY ./server/package.json ./server/package.json
-COPY ./server/tsconfig.json ./server/tsconfig.json
-COPY ./package.json ./pnpm-lock.yaml ./pnpm-workspace.yaml ./.npmrc ./
-COPY ./patches ./patches
-RUN pnpm install --frozen-lockfile
-
-# Copy client
-COPY ./client ./client
-RUN pnpm install --frozen-lockfile
-
-# Copy all source
+# Copy all source code first
 COPY . .
-RUN pnpm install --frozen-lockfile
+
+# Install all dependencies (including devDependencies for build)
+RUN pnpm install --prod=false
 
 # Build and cleanup (client and server)
 ENV NODE_ENV=production
 ENV VERSION=$VERSION
+
+# Use official build command
 RUN pnpm build
+
+# Install server side plugins
+RUN cd server && pnpm run plugin:install com.msgbyte.tasks com.msgbyte.linkmeta com.msgbyte.github com.msgbyte.simplenotify com.msgbyte.topic com.msgbyte.agora com.msgbyte.wxpusher com.msgbyte.welcome com.msgbyte.iam com.msgbyte.discover com.msgbyte.livekit && mkdir -p ./dist/public && cp -r ./public/plugins ./dist/public && cp ./public/registry-be.json ./dist/public
 
 # web static service port
 EXPOSE 3000

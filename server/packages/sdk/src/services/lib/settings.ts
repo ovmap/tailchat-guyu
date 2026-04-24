@@ -89,6 +89,7 @@ export const builtinAuthWhitelist = [
   '/user/checkTokenValid',
   '/group/getGroupBasicInfo',
   '/group/invite/findInviteByCode',
+  '/config/client', // 客户端配置接口，需要公开访问
 ];
 
 /**

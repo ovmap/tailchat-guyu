@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  tailchat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VERSION: 1.11.10
+    image: tailchat:latest
+    container_name: tailchat
+    restart: always
+    ports:
+      - "11000:11000"  # API Gateway
+      - "11001:11001"  # OpenAPI OIDC
+      - "3080:3080"    # Guyu HTTP Service
+    environment:
+      # 服务器密钥
+      - SECRET=l7FiCL0DcV9csLG6
+      
+      # MongoDB 连接 (云服务器)
+      - MONGO_URL=mongodb://admin:8tuWqoi33s4kvTHm@43.248.79.29:16316/tailchat?authSource=admin
+      
+      # Redis 连接 (云服务器)
+      - REDIS_URL=redis://:8tuWqoi33s4kvTHm@43.248.79.29:16315/
+      - TRANSPORTER=redis://:8tuWqoi33s4kvTHm@43.248.79.29:16315/
+      
+      # 服务端对外访问地址 (根据你的实际域名或 IP 修改)
+      - API_URL=http://guyu.ovmap.cn:11000
+      
+      # MinIO 对象存储配置 (云服务器)
+      - MINIO_URL=43.248.79.29:16317
+      - MINIO_BUCKET_NAME=tailchat
+      - MINIO_USER=tailchat
+      - MINIO_PASS=com.msgbyte.tailchat
+      
+      # Admin 后台密码
+      - ADMIN_USER=tailchat
+      - ADMIN_PASS=com.msgbyte.tailchat
+      
+      # Agora 声网音视频服务
+      - AGORA_APP_ID=f3b196eb276d431bb777e5cb531582f9
+      - AGORA_APP_CERT=d52565ccdf1a4e87b10d6179910b556e
+      - AGORA_CUSTOMER_KEY=60f1eadb99
+      
+      # 生产环境变量
+      - NODE_ENV=production
+    volumes:
+      # 持久化上传文件
+      - tailchat-uploads:/app/tailchat/server/uploads
+      # 持久化插件数据
+      - tailchat-plugins:/app/tailchat/server/public/plugins
+
+volumes:
+  tailchat-uploads:
+    driver: local
+  tailchat-plugins:
+    driver: local

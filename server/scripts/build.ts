@@ -25,6 +25,10 @@ async function buildTailchatServer() {
         './dist/services/openapi/oidc/views',
         { recursive: true }
       ),
+      // Copy Guyu lib JS files (not compiled by TypeScript)
+      fs.copy('./services/guyu/lib', './dist/services/guyu/lib', {
+        recursive: true,
+      }),
     ]);
 
     if (process.platform !== 'win32' || (await isAdmin())) {

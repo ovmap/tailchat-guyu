@@ -1,7 +1,7 @@
 {
   "extends": "./tsconfig.json",
   "include": ["./src/server/**/*.ts", "../models/**/*.ts"],
-  "exclude": ["node_modules/**/*", "dist"],
+  "exclude": ["node_modules/**/*", "dist", "../models/**/__tests__/**/*", "../models/**/*.spec.ts", "../models/**/*.test.ts"],
   "compilerOptions": {
     "rootDirs": ["./", "../"],
     "outDir": "./dist",
@@ -15,6 +15,7 @@
     "forceConsistentCasingInFileNames": true,
     "importsNotUsedAsValues": "error",
     "experimentalDecorators": true,
-    "noEmit": false
+    "noEmit": false,
+    "types": ["node"]
   }
 }

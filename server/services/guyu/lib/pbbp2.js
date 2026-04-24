@@ -1,6 +1,6 @@
 // @ts-nocheck
 /*eslint-disable block-scoped-var, id-length, no-control-regex, no-magic-numbers, no-prototype-builtins, no-redeclare, no-shadow, no-var, sort-vars*/
-import $protobuf from 'protobufjs/minimal.js';
+const $protobuf = require('protobufjs/minimal.js');
 
 $protobuf.util.Long = undefined;
 $protobuf.configure();
@@ -13,7 +13,7 @@ const $Reader = $protobuf.Reader,
 // Exported root namespace
 const $root = $protobuf.roots['default'] || ($protobuf.roots['default'] = {});
 
-export const pbbp2 = ($root.pbbp2 = (() => {
+const pbbp2 = ($root.pbbp2 = (() => {
   /**
    * Namespace pbbp2.
    * @exports pbbp2
@@ -772,4 +772,4 @@ export const pbbp2 = ($root.pbbp2 = (() => {
   return pbbp2;
 })());
 
-export { $root as default };
+module.exports = { pbbp2, $root };
