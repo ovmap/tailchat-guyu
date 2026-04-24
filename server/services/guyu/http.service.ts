@@ -32,7 +32,7 @@ interface WSClient {
   connectedAt: Date;
   lastHeartbeat: Date;
   isAlive: boolean;
-  heartbeatTimer?: NodeJS.Timeout;  // ✅ 添加定时器引用
+  heartbeatTimer?: NodeJS.Timeout; // ✅ 添加定时器引用
 }
 
 class GuyuHttpService extends TcService {
@@ -42,7 +42,10 @@ class GuyuHttpService extends TcService {
   private heartbeatTimer?: NodeJS.Timeout;
   // ✅ 缓存消息 ID 到群组信息的映射，用于回复消息时获取群组信息
   // message_id → { converseId, groupId }
-  private messageCache = new Map<string, { converseId: string; groupId: string }>();
+  private messageCache = new Map<
+    string,
+    { converseId: string; groupId: string }
+  >();
   private messageCacheTimeout = 10 * 60 * 1000; // 10分钟过期
 
   get serviceName() {
@@ -67,13 +70,13 @@ class GuyuHttpService extends TcService {
     setInterval(() => {
       const now = Date.now();
       const keysToDelete: string[] = [];
-      
+
       // 简单策略：如果缓存条目过多，可以清空
       if (this.messageCache.size > 1000) {
         this.messageCache.clear();
         this.logger.info('🧹 清理消息缓存（超过1000条）');
       }
-    }, 5 * 60 * 1000);  // 每5分钟检查一次
+    }, 5 * 60 * 1000); // 每5分钟检查一次
 
     // ✅ 先创建 WebSocket Server（在 listen 之前）
     this.wss = new WebSocketServer({
@@ -83,14 +86,16 @@ class GuyuHttpService extends TcService {
     // 处理 HTTP upgrade 事件（必须在 listen 之前绑定）
     this.fastify.server.on('upgrade', (request, socket, head) => {
       const pathname = request.url?.split('?')[0] || '';
-      
+
       this.logger.info(`🔌 WebSocket upgrade 请求: ${pathname}`);
       this.logger.info(`🔌 URL: ${request.url}`);
-      
+
       // 支持多个 WebSocket 端点
-      if (pathname === '/open-apis/ws' || 
-          pathname === '/v3/im/ws' || 
-          pathname === '/callback/ws/endpoint') {
+      if (
+        pathname === '/open-apis/ws' ||
+        pathname === '/v3/im/ws' ||
+        pathname === '/callback/ws/endpoint'
+      ) {
         this.logger.info(`✅ 处理 WebSocket upgrade: ${pathname}`);
         this.wss?.handleUpgrade(request, socket, head, (ws) => {
           this.wss?.emit('connection', ws, request);
@@ -149,49 +154,60 @@ class GuyuHttpService extends TcService {
    */
   private registerHttpRoutes() {
     // POST /open-apis/auth/v3/tenant_access_token/internal
-    this.fastify.post('/open-apis/auth/v3/tenant_access_token/internal', async (req: any, res: any) => {
-      const { app_id, app_secret } = req.body;
-      
-      // 模拟飞书认证响应
-      if (app_id && app_secret) {
+    this.fastify.post(
+      '/open-apis/auth/v3/tenant_access_token/internal',
+      async (req: any, res: any) => {
+        const { app_id, app_secret } = req.body;
+
+        // 模拟飞书认证响应
+        if (app_id && app_secret) {
+          return {
+            code: 0,
+            msg: 'ok',
+            tenant_access_token: 'mock_token_' + Date.now(),
+            expire: 7200,
+          };
+        }
+
         return {
-          code: 0,
-          msg: 'ok',
-          tenant_access_token: 'mock_token_' + Date.now(),
-          expire: 7200,
+          code: 10003,
+          msg: 'invalid app_id or app_secret',
+          tenant_access_token: '',
+          expire: 0,
         };
       }
-      
-      return {
-        code: 10003,
-        msg: 'invalid app_id or app_secret',
-        tenant_access_token: '',
-        expire: 0,
-      };
-    });
+    );
 
     // POST /callback/ws/endpoint
     // OpenClaw 注册 WebSocket 回调端点
     this.fastify.post('/callback/ws/endpoint', async (req: any, res: any) => {
       const body = req.body;
-      
+
       // ✅ 飞书 SDK 使用大写 AppID/AppSecret
       const appId = body?.AppID || body?.app_id;
       const appSecret = body?.AppSecret || body?.app_secret;
       const logId = req.headers['x-log-id'] || `log-${Date.now()}`;
-      
-      this.logger.info('📝 注册 WebSocket 回调端点:', { 
-        appId, 
+
+      this.logger.info('📝 注册 WebSocket 回调端点:', {
+        appId,
         logId,
-        bodyKeys: body ? Object.keys(body) : []
+        bodyKeys: body ? Object.keys(body) : [],
       });
-      
+
       // ✅ 返回飞书 SDK 期望的格式：ClientConfig 包含 PingInterval
+      // ✅ 使用请求的 Host header 构建正确的 WebSocket URL（支持域名和端口）
+      const host = req.headers.host || 'localhost:3080';
+      const protocol =
+        req.headers['x-forwarded-proto'] === 'https' ? 'wss' : 'ws';
+      const wsUrl = `${protocol}://${host}/v3/im/ws?app_id=${appId}`;
+
+      this.logger.info(`🔗 返回 WebSocket URL: ${wsUrl}`);
+
       return {
         code: 0,
         msg: 'success',
         data: {
-          URL: `ws://localhost:3080/v3/im/ws?app_id=${appId}`,
+          URL: wsUrl,
           ClientConfig: {
             PingInterval: 30,
             ReconnectCount: 3,
@@ -230,400 +246,459 @@ class GuyuHttpService extends TcService {
 
     // POST /open-apis/im/v1/messages
     // OpenClaw 插件调用此接口发送消息回复
-    this.fastify.post('/open-apis/im/v1/messages', async (req: any, res: any) => {
-      const { receive_id, msg_type, content } = req.body;
-      
-      this.logger.info('📥 收到 OpenClaw 消息发送请求:', { 
-        receive_id, 
-        msg_type: msg_type || 'text',
-        contentLength: content?.length || 0
-      });
-      
-      try {
-        // 解析内容
-        let contentJson: any;
+    this.fastify.post(
+      '/open-apis/im/v1/messages',
+      async (req: any, res: any) => {
+        const { receive_id, msg_type, content } = req.body;
+
+        this.logger.info('📥 收到 OpenClaw 消息发送请求:', {
+          receive_id,
+          msg_type: msg_type || 'text',
+          contentLength: content?.length || 0,
+        });
+
         try {
-          contentJson = JSON.parse(content);
-        } catch {
-          contentJson = { text: content };
-        }
+          // 解析内容
+          let contentJson: any;
+          try {
+            contentJson = JSON.parse(content);
+          } catch {
+            contentJson = { text: content };
+          }
 
-        // ✅ 解析 receive_id：群组消息时 receive_id 就是 groupId
-        const groupId = receive_id;
-        const converseId = receive_id;
+          // ✅ 解析 receive_id：群组消息时 receive_id 就是 groupId
+          const groupId = receive_id;
+          const converseId = receive_id;
 
-        // ✅ lark 插件不会携带 app_id，需要从当前 WebSocket 客户端获取
-        let appId = req.headers['x-app-id'] || 
-                    req.headers['X-App-ID'] || 
-                    req.query?.app_id || 
-                    req.body?.app_id ||
-                    req.body?.AppID;
-        
-        if (!appId && this.clients.size === 1) {
-          appId = Array.from(this.clients.keys())[0];
-          this.logger.info(`🔑 使用当前连接的客户端 appId: ${appId}`);
-        }
-        
-        if (!appId) {
-          this.logger.error('❌ 缺少 app_id，且没有活动的 WebSocket 客户端连接');
+          // ✅ lark 插件不会携带 app_id，需要从当前 WebSocket 客户端获取
+          let appId =
+            req.headers['x-app-id'] ||
+            req.headers['X-App-ID'] ||
+            req.query?.app_id ||
+            req.body?.app_id ||
+            req.body?.AppID;
+
+          if (!appId && this.clients.size === 1) {
+            appId = Array.from(this.clients.keys())[0];
+            this.logger.info(`🔑 使用当前连接的客户端 appId: ${appId}`);
+          }
+
+          if (!appId) {
+            this.logger.error(
+              '❌ 缺少 app_id，且没有活动的 WebSocket 客户端连接'
+            );
+            return {
+              code: 10001,
+              msg: 'Missing app_id and no active WebSocket client',
+              data: null,
+            };
+          }
+
+          // 获取 bot 账号信息
+          const botAccount: any = await this.broker.call(
+            'guyu.bot.getOrCreateBotAccount',
+            {
+              appId,
+            }
+          );
+
+          this.logger.info('🤖 使用 bot 账号发送消息:', {
+            userId: botAccount.userId,
+            nickname: botAccount.nickname,
+          });
+
+          // 根据 msg_type 构造 Tailchat 消息格式
+          let messageContent: any;
+          switch (msg_type) {
+            case 'text':
+              messageContent = {
+                type: 'text',
+                content: contentJson.text || contentJson,
+              };
+              break;
+            case 'image':
+              messageContent = {
+                type: 'image',
+                content: contentJson.image_key || contentJson.url,
+              };
+              break;
+            case 'post':
+              messageContent = {
+                type: 'rich',
+                title: contentJson.title?.zh_cn || '',
+                content: contentJson.content || [],
+              };
+              break;
+            default:
+              messageContent = {
+                type: 'text',
+                content: contentJson.text || contentJson,
+              };
+          }
+
+          // 调用 Tailchat 发消息接口
+          await this.broker.call(
+            'chat.message.sendMessage',
+            {
+              converseId,
+              content: JSON.stringify(messageContent),
+              groupId,
+            },
+            {
+              meta: {
+                userId: botAccount.userId,
+              },
+            }
+          );
+
+          this.logger.info('✅ 消息发送成功');
+
+          return {
+            code: 0,
+            msg: 'ok',
+            data: {
+              message_id: 'om_' + Date.now(),
+              chat_id: converseId,
+              create_time: Date.now().toString(),
+            },
+          };
+        } catch (e: any) {
+          this.logger.error('❌ 发送消息失败:', e);
           return {
             code: 10001,
-            msg: 'Missing app_id and no active WebSocket client',
+            msg: e.message || 'Failed to send message',
             data: null,
           };
         }
-
-        // 获取 bot 账号信息
-        const botAccount: any = await this.broker.call('guyu.bot.getOrCreateBotAccount', {
-          appId,
-        });
-
-        this.logger.info('🤖 使用 bot 账号发送消息:', {
-          userId: botAccount.userId,
-          nickname: botAccount.nickname,
-        });
-
-        // 根据 msg_type 构造 Tailchat 消息格式
-        let messageContent: any;
-        switch (msg_type) {
-          case 'text':
-            messageContent = {
-              type: 'text',
-              content: contentJson.text || contentJson,
-            };
-            break;
-          case 'image':
-            messageContent = {
-              type: 'image',
-              content: contentJson.image_key || contentJson.url,
-            };
-            break;
-          case 'post':
-            messageContent = {
-              type: 'rich',
-              title: contentJson.title?.zh_cn || '',
-              content: contentJson.content || [],
-            };
-            break;
-          default:
-            messageContent = {
-              type: 'text',
-              content: contentJson.text || contentJson,
-            };
-        }
-
-        // 调用 Tailchat 发消息接口
-        await this.broker.call(
-          'chat.message.sendMessage',
-          {
-            converseId,
-            content: JSON.stringify(messageContent),
-            groupId,
-          },
-          {
-            meta: {
-              userId: botAccount.userId,
-            },
-          }
-        );
-        
-        this.logger.info('✅ 消息发送成功');
-        
-        return {
-          code: 0,
-          msg: 'ok',
-          data: {
-            message_id: 'om_' + Date.now(),
-            chat_id: converseId,
-            create_time: Date.now().toString(),
-          },
-        };
-      } catch (e: any) {
-        this.logger.error('❌ 发送消息失败:', e);
-        return {
-          code: 10001,
-          msg: e.message || 'Failed to send message',
-          data: null,
-        };
       }
-    });
+    );
 
     // ✅ 新增：回复消息端点（飞书 SDK 用于回复特定消息）
-    this.fastify.post('/open-apis/im/v1/messages/:message_id/reply', async (req: any, res: any) => {
-      const { message_id } = req.params;
-      const { content, msg_type } = req.body;
-      
-      this.logger.info('📨 收到 OpenClaw 回复消息请求:', { 
-        message_id,
-        msg_type: msg_type || 'text'
-      });
-      
-      try {
-        this.logger.info(`🔍 解析内容: content=${JSON.stringify(content)?.substring(0, 100)}`);
-        
-        // 解析内容
-        let contentJson: any;
-        try {
-          contentJson = JSON.parse(content);
-        } catch {
-          contentJson = { text: content };
-        }
-        
-        this.logger.info(`🔍 contentJson:`, contentJson);
+    this.fastify.post(
+      '/open-apis/im/v1/messages/:message_id/reply',
+      async (req: any, res: any) => {
+        const { message_id } = req.params;
+        const { content, msg_type } = req.body;
 
-        let appId = req.headers['x-app-id'] || 
-                    req.headers['X-App-ID'] || 
-                    req.query?.app_id || 
-                    req.body?.app_id ||
-                    req.body?.AppID;
-        
-        this.logger.info(`🔍 appId: ${appId}, clients.size: ${this.clients.size}`);
-        
-        if (!appId && this.clients.size === 1) {
-          appId = Array.from(this.clients.keys())[0];
-        }
-        
-        if (!appId) {
-          this.logger.error('❌ 回复消息缺少 app_id');
-          return { code: 10001, msg: 'Missing app_id', data: null };
-        }
-
-        this.logger.info(`🔍 获取机器人账号: appId=${appId}`);
-        
-        const botAccount: any = await this.broker.call('guyu.bot.getOrCreateBotAccount', {
-          appId,
+        this.logger.info('📨 收到 OpenClaw 回复消息请求:', {
+          message_id,
+          msg_type: msg_type || 'text',
         });
-        
-        this.logger.info(`🔍 botAccount.userId: ${botAccount?.userId}`);
 
-        // ✅ 解析飞书消息格式，提取实际文本内容
-        let textContent = '';
-        if (contentJson.zh_cn?.content) {
-          // 飞书富文本格式：{ zh_cn: { content: [[{tag:"text", text:"..."}]] } }
-          const rows = contentJson.zh_cn.content;
-          textContent = rows
-            .flat()
-            .map((item: any) => item.text || '')
-            .join('');
-          this.logger.info(`📝 提取飞书文本: ${textContent.substring(0, 100)}...`);
-        } else if (contentJson.text) {
-          textContent = contentJson.text;
-        } else {
-          textContent = JSON.stringify(contentJson);
-        }
+        try {
+          this.logger.info(
+            `🔍 解析内容: content=${JSON.stringify(content)?.substring(0, 100)}`
+          );
 
-        // ✅ Tailchat 消息内容直接是纯文本
-        const messageContent = textContent;
-        
-        this.logger.info(`🔍 messageContent:`, messageContent);
-
-        // 获取群组信息
-        // ✅ 优先从请求体获取，如果没有则从缓存中查找（OpenClaw 回复时可能不携带 chat_id）
-        const cachedInfo = this.messageCache.get(message_id);
-        const converseId = req.body.chat_id || cachedInfo?.converseId;
-        const groupId = cachedInfo?.groupId || converseId;
-        
-        this.logger.info(`🔍 群组信息: req.body.chat_id=${req.body.chat_id}, cached=${JSON.stringify(cachedInfo)}`);
-        
-        if (!converseId) {
-          this.logger.error(`❌ 回复消息缺少 converseId，且缓存中找不到 message_id: ${message_id}`);
-          return { code: 10001, msg: 'Missing converseId', data: null };
-        }
-
-        this.logger.info(`📤 准备发送消息: converseId=${converseId}, groupId=${groupId}`);
-        
-        // 调用 Tailchat 发消息接口
-        await this.broker.call(
-          'chat.message.sendMessage',
-          {
-            converseId,
-            content: JSON.stringify(messageContent),
-            groupId,
-          },
-          {
-            meta: {
-              userId: botAccount.userId,
-            },
+          // 解析内容
+          let contentJson: any;
+          try {
+            contentJson = JSON.parse(content);
+          } catch {
+            contentJson = { text: content };
           }
-        );
-        
-        this.logger.info(`✅ 回复消息成功: message_id=${message_id}`);
-        
+
+          this.logger.info(`🔍 contentJson:`, contentJson);
+
+          let appId =
+            req.headers['x-app-id'] ||
+            req.headers['X-App-ID'] ||
+            req.query?.app_id ||
+            req.body?.app_id ||
+            req.body?.AppID;
+
+          this.logger.info(
+            `🔍 appId: ${appId}, clients.size: ${this.clients.size}`
+          );
+
+          if (!appId && this.clients.size === 1) {
+            appId = Array.from(this.clients.keys())[0];
+          }
+
+          if (!appId) {
+            this.logger.error('❌ 回复消息缺少 app_id');
+            return { code: 10001, msg: 'Missing app_id', data: null };
+          }
+
+          this.logger.info(`🔍 获取机器人账号: appId=${appId}`);
+
+          const botAccount: any = await this.broker.call(
+            'guyu.bot.getOrCreateBotAccount',
+            {
+              appId,
+            }
+          );
+
+          this.logger.info(`🔍 botAccount.userId: ${botAccount?.userId}`);
+
+          // ✅ 解析飞书消息格式，提取实际文本内容
+          let textContent = '';
+          if (contentJson.zh_cn?.content) {
+            // 飞书富文本格式：{ zh_cn: { content: [[{tag:"text", text:"..."}]] } }
+            const rows = contentJson.zh_cn.content;
+            textContent = rows
+              .flat()
+              .map((item: any) => item.text || '')
+              .join('');
+            this.logger.info(
+              `📝 提取飞书文本: ${textContent.substring(0, 100)}...`
+            );
+          } else if (contentJson.text) {
+            textContent = contentJson.text;
+          } else {
+            textContent = JSON.stringify(contentJson);
+          }
+
+          // ✅ Tailchat 消息内容直接是纯文本
+          const messageContent = textContent;
+
+          this.logger.info(`🔍 messageContent:`, messageContent);
+
+          // 获取群组信息
+          // ✅ 优先从请求体获取，如果没有则从缓存中查找（OpenClaw 回复时可能不携带 chat_id）
+          const cachedInfo = this.messageCache.get(message_id);
+          const converseId = req.body.chat_id || cachedInfo?.converseId;
+          const groupId = cachedInfo?.groupId || converseId;
+
+          this.logger.info(
+            `🔍 群组信息: req.body.chat_id=${
+              req.body.chat_id
+            }, cached=${JSON.stringify(cachedInfo)}`
+          );
+
+          if (!converseId) {
+            this.logger.error(
+              `❌ 回复消息缺少 converseId，且缓存中找不到 message_id: ${message_id}`
+            );
+            return { code: 10001, msg: 'Missing converseId', data: null };
+          }
+
+          this.logger.info(
+            `📤 准备发送消息: converseId=${converseId}, groupId=${groupId}`
+          );
+
+          // 调用 Tailchat 发消息接口
+          await this.broker.call(
+            'chat.message.sendMessage',
+            {
+              converseId,
+              content: JSON.stringify(messageContent),
+              groupId,
+            },
+            {
+              meta: {
+                userId: botAccount.userId,
+              },
+            }
+          );
+
+          this.logger.info(`✅ 回复消息成功: message_id=${message_id}`);
+
+          return {
+            code: 0,
+            msg: 'success',
+            data: {
+              message_id: 'om_reply_' + Date.now(),
+              chat_id: converseId,
+              create_time: Date.now().toString(),
+            },
+          };
+        } catch (e: any) {
+          this.logger.error('❌ 回复消息失败:', e);
+          return {
+            code: 10001,
+            msg: e.message || 'Failed to reply message',
+            data: null,
+          };
+        }
+      }
+    );
+
+    // ✅ 新增：获取单条消息
+    this.fastify.get(
+      '/open-apis/im/v1/messages/:message_id',
+      async (req: any, res: any) => {
+        const { message_id } = req.params;
+
+        this.logger.info('📝 获取消息:', { message_id });
+
+        // ⚠️ Tailchat 的消息查询需要 converseId 和 groupId
+        // 这里返回占位数据，实际需要从 Tailchat 查询
         return {
           code: 0,
           msg: 'success',
           data: {
-            message_id: 'om_reply_' + Date.now(),
-            chat_id: converseId,
+            message_id,
+            chat_id: 'unknown',
+            message_type: 'text',
+            content: JSON.stringify({ text: 'Placeholder' }),
+            create_time: Date.now().toString(),
+            sender: {
+              sender_id: {
+                open_id: 'bot_placeholder',
+              },
+              sender_type: 'user',
+            },
+          },
+        };
+      }
+    );
+
+    // ✅ 新增：获取消息历史
+    this.fastify.get(
+      '/open-apis/im/v1/messages',
+      async (req: any, res: any) => {
+        const { container_id, page_token, page_size = 20 } = req.query;
+
+        this.logger.info('📚 获取消息历史:', { container_id, page_size });
+
+        // ⚠️ 返回空列表，实际需要从 Tailchat 查询
+        return {
+          code: 0,
+          msg: 'success',
+          data: {
+            items: [],
+            has_more: false,
+          },
+        };
+      }
+    );
+
+    // ✅ 新增：更新消息（飞书 SDK 用于编辑已发送消息）
+    this.fastify.put(
+      '/open-apis/im/v1/messages/:message_id',
+      async (req: any, res: any) => {
+        const { message_id } = req.params;
+        const { chat_id, msg_type, content } = req.body;
+
+        this.logger.info('📝 更新消息:', { message_id, chat_id });
+
+        // ⚠️ Tailchat 目前不支持消息编辑
+        return {
+          code: 0,
+          msg: 'success',
+          data: {
+            message_id,
+            chat_id,
             create_time: Date.now().toString(),
           },
         };
-      } catch (e: any) {
-        this.logger.error('❌ 回复消息失败:', e);
-        return {
-          code: 10001,
-          msg: e.message || 'Failed to reply message',
-          data: null,
-        };
       }
-    });
-
-    // ✅ 新增：获取单条消息
-    this.fastify.get('/open-apis/im/v1/messages/:message_id', async (req: any, res: any) => {
-      const { message_id } = req.params;
-      
-      this.logger.info('📝 获取消息:', { message_id });
-      
-      // ⚠️ Tailchat 的消息查询需要 converseId 和 groupId
-      // 这里返回占位数据，实际需要从 Tailchat 查询
-      return {
-        code: 0,
-        msg: 'success',
-        data: {
-          message_id,
-          chat_id: 'unknown',
-          message_type: 'text',
-          content: JSON.stringify({ text: 'Placeholder' }),
-          create_time: Date.now().toString(),
-          sender: {
-            sender_id: {
-              open_id: 'bot_placeholder',
-            },
-            sender_type: 'user',
-          },
-        },
-      };
-    });
-
-    // ✅ 新增：获取消息历史
-    this.fastify.get('/open-apis/im/v1/messages', async (req: any, res: any) => {
-      const { container_id, page_token, page_size = 20 } = req.query;
-      
-      this.logger.info('📚 获取消息历史:', { container_id, page_size });
-      
-      // ⚠️ 返回空列表，实际需要从 Tailchat 查询
-      return {
-        code: 0,
-        msg: 'success',
-        data: {
-          items: [],
-          has_more: false,
-        },
-      };
-    });
-
-    // ✅ 新增：更新消息（飞书 SDK 用于编辑已发送消息）
-    this.fastify.put('/open-apis/im/v1/messages/:message_id', async (req: any, res: any) => {
-      const { message_id } = req.params;
-      const { chat_id, msg_type, content } = req.body;
-      
-      this.logger.info('📝 更新消息:', { message_id, chat_id });
-      
-      // ⚠️ Tailchat 目前不支持消息编辑
-      return {
-        code: 0,
-        msg: 'success',
-        data: {
-          message_id,
-          chat_id,
-          create_time: Date.now().toString(),
-        },
-      };
-    });
+    );
 
     // GET /open-apis/contact/v3/users/:user_id
     // OpenClaw 获取用户信息
-    this.fastify.get('/open-apis/contact/v3/users/:user_id', async (req: any, res: any) => {
-      const { user_id } = req.params;
-      const user_id_type = req.query.user_id_type || 'open_id';
-      
-      this.logger.info(`📞 获取用户信息: user_id=${user_id}, user_id_type=${user_id_type}`);
-      
-      // Mock 用户数据
-      const mockUsers: Record<string, any> = {
-        'ou_bot_xxx': {
-          open_id: 'ou_bot_xxx',
-          name: 'AI Assistant',
-          en_name: 'AI Assistant',
-          nickname: '傻妞',
+    this.fastify.get(
+      '/open-apis/contact/v3/users/:user_id',
+      async (req: any, res: any) => {
+        const { user_id } = req.params;
+        const user_id_type = req.query.user_id_type || 'open_id';
+
+        this.logger.info(
+          `📞 获取用户信息: user_id=${user_id}, user_id_type=${user_id_type}`
+        );
+
+        // Mock 用户数据
+        const mockUsers: Record<string, any> = {
+          ou_bot_xxx: {
+            open_id: 'ou_bot_xxx',
+            name: 'AI Assistant',
+            en_name: 'AI Assistant',
+            nickname: '傻妞',
+            avatar_url: '',
+            department_id: 'od_test_001',
+            status: { is_active: true },
+          },
+        };
+
+        const user = mockUsers[user_id] || {
+          open_id: user_id,
+          name: user_id.replace('ou_', '').replace('_', ' '),
+          en_name: '',
+          nickname: '',
           avatar_url: '',
-          department_id: 'od_test_001',
           status: { is_active: true },
-        },
-      };
-      
-      const user = mockUsers[user_id] || {
-        open_id: user_id,
-        name: user_id.replace('ou_', '').replace('_', ' '),
-        en_name: '',
-        nickname: '',
-        avatar_url: '',
-        status: { is_active: true },
-      };
-      
-      return {
-        code: 0,
-        msg: 'success',
-        data: {
-          user,
-        },
-      };
-    });
+        };
+
+        return {
+          code: 0,
+          msg: 'success',
+          data: {
+            user,
+          },
+        };
+      }
+    );
 
     // POST /open-apis/im/v1/messages/:message_id/reactions
     // OpenClaw 添加消息表情回应（输入指示器）
-    this.fastify.post('/open-apis/im/v1/messages/:message_id/reactions', async (req: any, res: any) => {
-      const { message_id } = req.params;
-      const { reaction_type } = req.body;
-      
-      const emojiType = reaction_type?.emoji_type || 'unknown';
-      
-      this.logger.info(`👍 添加表情回应: message_id=${message_id}, emoji_type=${emojiType}`);
-      
-      // 返回 mock reaction_id
-      const reactionId = `or_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      
-      return {
-        code: 0,
-        msg: 'success',
-        data: {
-          reaction_id: reactionId,
-        },
-      };
-    });
+    this.fastify.post(
+      '/open-apis/im/v1/messages/:message_id/reactions',
+      async (req: any, res: any) => {
+        const { message_id } = req.params;
+        const { reaction_type } = req.body;
+
+        const emojiType = reaction_type?.emoji_type || 'unknown';
+
+        this.logger.info(
+          `👍 添加表情回应: message_id=${message_id}, emoji_type=${emojiType}`
+        );
+
+        // 返回 mock reaction_id
+        const reactionId = `or_${Date.now()}_${Math.random()
+          .toString(36)
+          .substr(2, 9)}`;
+
+        return {
+          code: 0,
+          msg: 'success',
+          data: {
+            reaction_id: reactionId,
+          },
+        };
+      }
+    );
 
     // DELETE /open-apis/im/v1/messages/:message_id/reactions/:reaction_id
     // OpenClaw 删除消息表情回应
-    this.fastify.delete('/open-apis/im/v1/messages/:message_id/reactions/:reaction_id', async (req: any, res: any) => {
-      const { message_id, reaction_id } = req.params;
-      
-      this.logger.info(`🗑️ 删除表情回应: message_id=${message_id}, reaction_id=${reaction_id}`);
-      
-      return {
-        code: 0,
-        msg: 'success',
-        data: null,
-      };
-    });
+    this.fastify.delete(
+      '/open-apis/im/v1/messages/:message_id/reactions/:reaction_id',
+      async (req: any, res: any) => {
+        const { message_id, reaction_id } = req.params;
+
+        this.logger.info(
+          `🗑️ 删除表情回应: message_id=${message_id}, reaction_id=${reaction_id}`
+        );
+
+        return {
+          code: 0,
+          msg: 'success',
+          data: null,
+        };
+      }
+    );
 
     // POST /open-apis/bot/v1/openclaw_bot/ping
     // OpenClaw 插件调用此端点验证机器人身份
-    this.fastify.post('/open-apis/bot/v1/openclaw_bot/ping', async (req: any, res: any) => {
-      const { needBotInfo } = req.body;
-      
-      this.logger.info('🤖 收到 bot ping 请求:', { needBotInfo });
-      
-      return {
-        code: 0,
-        msg: 'success',
-        data: {
-          pingBotInfo: {
-            botID: 'ou_bot_' + Date.now(),
-            botName: 'GuYu Bot',
+    this.fastify.post(
+      '/open-apis/bot/v1/openclaw_bot/ping',
+      async (req: any, res: any) => {
+        const { needBotInfo } = req.body;
+
+        this.logger.info('🤖 收到 bot ping 请求:', { needBotInfo });
+
+        return {
+          code: 0,
+          msg: 'success',
+          data: {
+            pingBotInfo: {
+              botID: 'ou_bot_' + Date.now(),
+              botName: 'GuYu Bot',
+            },
           },
-        },
-      };
-    });
+        };
+      }
+    );
 
     // GET /health
     this.fastify.get('/health', async (req: any, res: any) => {
@@ -726,7 +801,6 @@ class GuyuHttpService extends TcService {
    * ✅ 这是内部方法，由 guyu.bot 服务直接调用（不通过 Moleculer Action）
    */
   async pushToClient(appId: string, event: any): Promise<boolean> {
-
     const client = this.clients.get(appId);
     if (!client || client.ws.readyState !== WebSocket.OPEN) {
       this.logger.warn(`⚠️ WebSocket 客户端未连接: ${appId}`);
@@ -735,7 +809,9 @@ class GuyuHttpService extends TcService {
 
     try {
       // 构造飞书 v2 事件格式
-      const eventId = event.header?.event_id || `evt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const eventId =
+        event.header?.event_id ||
+        `evt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       const feishuEvent = {
         schema: '2.0',
         header: {
@@ -755,14 +831,18 @@ class GuyuHttpService extends TcService {
       // - groupId 用于群组鉴权（getGroupInfo）
       const eventMessage = feishuEvent.event?.message || feishuEvent.event;
       const originalMessageId = eventMessage?.message_id || '';
-      const converseId = eventMessage?.chat_id || '';  // converseId 用于广播
-      const groupId = eventMessage?._groupId || converseId;  // groupId 用于鉴权
-      
-      this.logger.info(`🔍 推送消息调试: originalMessageId=${originalMessageId}, converseId=${converseId}, groupId=${groupId}`);
-      
+      const converseId = eventMessage?.chat_id || ''; // converseId 用于广播
+      const groupId = eventMessage?._groupId || converseId; // groupId 用于鉴权
+
+      this.logger.info(
+        `🔍 推送消息调试: originalMessageId=${originalMessageId}, converseId=${converseId}, groupId=${groupId}`
+      );
+
       if (originalMessageId && converseId) {
         this.messageCache.set(originalMessageId, { converseId, groupId });
-        this.logger.info(`💾 缓存消息映射: ${originalMessageId} → { converseId: ${converseId}, groupId: ${groupId} }`);
+        this.logger.info(
+          `💾 缓存消息映射: ${originalMessageId} → { converseId: ${converseId}, groupId: ${groupId} }`
+        );
       }
 
       const eventPayload = JSON.stringify(feishuEvent);
@@ -799,7 +879,11 @@ class GuyuHttpService extends TcService {
   /**
    * 处理 WebSocket 消息
    */
-  private handleWebSocketMessage(ws: WebSocket, data: Buffer, client: WSClient) {
+  private handleWebSocketMessage(
+    ws: WebSocket,
+    data: Buffer,
+    client: WSClient
+  ) {
     client.lastHeartbeat = new Date();
     client.isAlive = true;
 
@@ -839,7 +923,10 @@ class GuyuHttpService extends TcService {
       // 处理其他消息（未来可以处理 openclaw 插件的响应）
       if (frame.payload) {
         const payloadStr = new TextDecoder().decode(frame.payload);
-        this.logger.info('📨 收到 openclaw 消息:', payloadStr.substring(0, 200));
+        this.logger.info(
+          '📨 收到 openclaw 消息:',
+          payloadStr.substring(0, 200)
+        );
       }
     } catch (e) {
       // 如果不是 protobuf 格式，尝试当作纯文本处理
@@ -868,7 +955,7 @@ class GuyuHttpService extends TcService {
           this.clients.delete(appId);
           this.logger.info('⏰ 心跳超时，断开客户端:', appId);
         }
-        client.isAlive = false;  // 重置标记，等待下次 pong
+        client.isAlive = false; // 重置标记，等待下次 pong
       });
     }, 30000);
   }
