@@ -1,14 +1,15 @@
 name: "deploy nightly"
 
-on:
-  push:
-    branches:
-      - master
-    paths:
-      - "client/web/**"
-      - "client/shared/**"
-      - "client/packages/design/**"
-  workflow_dispatch:
+# ✅ Disabled - uncomment to re-enable
+# on:
+#   push:
+#     branches:
+#       - master
+#     paths:
+#       - "client/web/**"
+#       - "client/shared/**"
+#       - "client/packages/design/**"
+#   workflow_dispatch:
 
 jobs:
   deploy:
