@@ -1,4 +1,4 @@
-# Tailchat
+# Tailchat + Guyu (谷雨)
 
 [![Docker Publish](https://github.com/msgbyte/tailchat/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/msgbyte/tailchat/actions/workflows/docker-publish.yml)
 ![Docker Image Version (tag latest semver)](https://img.shields.io/docker/v/moonrailgun/tailchat/latest)
@@ -6,67 +6,175 @@
 [![CI](https://github.com/msgbyte/tailchat/actions/workflows/ci.yaml/badge.svg)](https://github.com/msgbyte/tailchat/actions/workflows/ci.yaml)
 [![Codemagic build status](https://api.codemagic.io/apps/63e27be62b9d4ca848b5491d/android/status_badge.svg)](https://codemagic.io/apps/63e27be62b9d4ca848b5491d/android/latest_build)
 [![Desktop Build](https://github.com/msgbyte/tailchat/actions/workflows/desktop-build.yml/badge.svg)](https://github.com/msgbyte/tailchat/actions/workflows/desktop-build.yml)
-[![deploy nightly](https://github.com/msgbyte/tailchat/actions/workflows/vercel-nightly.yml/badge.svg)](https://github.com/msgbyte/tailchat/actions/workflows/vercel-nightly.yml)
-![Tailchat Nightly](https://tianji.moonrailgun.com/monitor/clnzoxcy10001vy2ohi4obbi0/clo1oiwbp001dof5e76cmkzj9/badge.svg)
-
-![tailchat](https://socialify.git.ci/msgbyte/tailchat/image?description=1&font=Inter&forks=1&issues=1&language=1&logo=https%3A%2F%2Favatars.githubusercontent.com%2Fu%2F86033898%3Fs%3D200%26v%3D4&name=1&owner=1&pattern=Circuit%20Board&stargazers=1&theme=Light)
 
 [简体中文](./README.zh.md)
 
-## Next generation noIM application in your own workspace
+## Next generation noIM application with OpenClaw integration
 
-### Not only another `Slack`, `Discord`, `Rocket.Chat`....
+### Tailchat + Guyu: Your Self-Hosted OpenClaw Gateway
 
-If you are interested in the concept of `noIM`, welcome to read my blog:
-- [It's time to officially step into the era of noIM](https://tailchat.msgbyte.com/blog/2023/03/01/the-era-of-noIM)
+This project is a **Tailchat** fork enhanced with **Guyu (谷雨)** service, providing:
 
-Official Documentation: [https://tailchat.msgbyte.com/](https://tailchat.msgbyte.com/)
+- **OpenClaw Integration**: Self-host OpenClaw with full real-time messaging via WebSocket
+- **Feishu/Lark Protocol Compatibility**: Bridge OpenClaw bots to Tailchat seamlessly
+- **Bot Management**: Create and manage bot accounts through an intuitive admin panel
+- **Real-time Bidirectional Messaging**: Instant message delivery between Tailchat and OpenClaw
 
-**Nightly version** Try it online: [https://nightly.paw.msgbyte.com/](https://nightly.paw.msgbyte.com/)
+## Why Guyu + OpenClaw?
 
-> Nightly version is the automatic compile version, that means, every commit code will be automatically compiled.
-> The reliability and stability of the data are not guaranteed, you can deploy with stable version with docker images or github release page
+OpenClaw is a powerful AI agent framework, but deploying it privately with IM integration has been challenging. **Guyu (谷雨)** solves this by:
 
-## Motivation
+1. **Complete Privacy Control**: Host everything on your own infrastructure - no third-party dependencies
+2. **Feishu Protocol Bridge**: OpenClaw talks Feishu protocol; Guyu translates to Tailchat native messages
+3. **Real-time WebSocket Connection**: Sub-second message delivery with heartbeat health checks
+4. **Multi-tenant Support**: One Guyu instance can serve multiple OpenClaw apps simultaneously
+5. **Plugin-based Architecture**: Extend functionality without modifying core code
 
-At present, the existing IM applications only focus on chatting itself, and IM is naturally a multi-person collaboration method. In my opinion, it should be able to take on more responsibilities, and form its own unique way of forwarding external applications through IM workflow.
+### Architecture
 
-Therefore, I bring up the point of `noIM`, which means **Not only IM**. Instead, it designed a highly customized application platform for individuals/teams centered on IM, with third-party applications as enhanced functions, and a plugin system as the glue connection layer in the middle.
+```
+┌─────────────┐     REST/WebSocket      ┌─────────────┐
+│  Frontend   │ ←────────────────────→ │  Backend    │
+│  (Admin UI) │                        │  Guyu       │
+└─────────────┘                        └──────┬──────┘
+                                              │
+                                              │ Channel SDK
+                                              ▼
+                                       ┌─────────────┐
+                                       │  OpenClaw   │
+                                       │  Gateway    │
+                                       └─────────────┘
+```
 
-To this end, the functions were abstracted, and a lot of time was spent designing the underlying mechanism. An instant messaging application such as `Tailchat` was born for expansion from the beginning of the underlying design. Through `Tailchat`'s plugin system, developers can easily use their favorite applications as part of `Tailchat` in a very natural way. Different from traditional integration methods such as `Slack`, the integration of `Tailchat` is more free, as if it is a native function.
+## Quick Start - Deploy OpenClaw Privately
 
-## Feature
+### Prerequisites
 
-- Pay attention to privacy, only invited members can join the group
-- Prevent strangers, add friends only by nickname + a random string of numbers
-- Two-level group space, dividing different topics by panels
-- Highly customized group space, create original group space by grouping with dragging and dropping. At the same time, more plugins can be used to add more capabilities
-- It can be rigorous or fun. Through the combination of plugins, `Tailchat` can be created for different scenarios. It can be for individuals or for enterprises
-- The backend microservice structure is ready for large-scale deployment. Don't worry about what to do after the number of user growth
+- Docker & Docker Compose
+- MongoDB
+- Redis
 
-Learn more in our [website](https://tailchat.msgbyte.com/)
+### Deploy with Docker
+
+```bash
+# Clone the repository
+git clone https://github.com/msgbyte/tailchat.git
+cd tailchat
+
+# Start all services
+docker-compose up -d
+```
+
+### Configure Guyu + OpenClaw
+
+1. Access Tailchat web UI (default: `http://localhost:3000`)
+2. Navigate to **Guyu** plugin from the sidebar
+3. Create a new application with Bot capability enabled
+4. Copy the `App ID` and `App Secret`
+5. Configure your OpenClaw instance with these credentials
+6. Connect OpenClaw via WebSocket: `ws://your-server:3080/open-apis/ws`
+
+## Features
+
+### Core Tailchat Features
+
+- **Privacy First**: Invite-only group access, no public discovery
+- **Anti-Spam**: Friend requests require nickname + random identifier
+- **Two-Level Group Space**: Organize conversations by panels and channels
+- **Highly Customizable**: Drag-and-drop group creation, extensible via plugins
+- **Microservice Backend**: Ready for large-scale clustered deployment
+- **Cross-Platform**: Web, Desktop (Electron), and Mobile (React Native)
+
+### Guyu (谷雨) OpenClaw Integration
+
+- **OpenClaw Gateway**: Full WebSocket bridge for real-time messaging
+- **Feishu Protocol Compatible**: Drop-in replacement for Feishu bot integration
+- **Bot Management UI**: Create apps, enable bot capability, manage credentials
+- **Message Translation**: Automatic conversion between OpenClaw and Tailchat formats
+- **Heartbeat Monitoring**: Automatic connection health checks and recovery
+- **Multi-Connection Support**: One Guyu server can serve multiple OpenClaw instances
+- **Group & DM Support**: Bots work in both private messages and group channels
+
+## Screenshots
+
+### Guyu Admin Panel
+
+![Guyu App Management](./website/static/img/guyu/guyu1.png)
+
+![Guyu App Configuration](./website/static/img/guyu/guyu2.png)
+
+### Bot Integration
+
+![Guyu Bot Settings](./website/static/img/guyu/guyu3.png)
+
+![Guyu OpenClaw Connection](./website/static/img/guyu/guyu4.png)
+
+### App Credentials
+
+![Guyu App Credentials](./website/static/img/guyu/guyu5.png)
 
 ## Performance and Expansion
 
-Tailchat is a modern open source IM application which based on **React** + **Typescript**
+Tailchat is built with **React** + **TypeScript**, featuring:
 
-Front-end microkernel architecture + backend microservice architecture, `Tailchat` is ready for clustering deployment.
+- **Frontend Microkernel Architecture**: Plugin-based extension system
+- **Backend Microservice Architecture**: Moleculer framework for distributed services
+- **Guyu Service**: Dedicated OpenClaw gateway with WebSocket and HTTP APIs
 
-The front end empowers the application through the plugin system, which is very simple and easy to expand for the secondary development of `Tailchat`.
+The plugin system makes secondary development straightforward - Guyu itself is implemented as a Tailchat plugin.
 
-**NOTICE: Although the core functionality of Tailchat is currently in a stable stage, its exposed interface for third-party developers is still being improved. Generally speaking, it is backward compatible, but retains the possibility of Break Change**
+**NOTICE**: While Tailchat's core functionality is stable, the third-party developer API is still evolving. It's generally backward compatible, but breaking changes are possible.
 
-## Preview
+## Technical Details
 
-![](./website/static/img/intro/hello.png)
+### Guyu Services
 
-![](./website/static/img/intro/plugins.png)
+| Service | Port | Protocol | Description |
+|---------|------|----------|-------------|
+| guyu.http | 3080 | HTTP/WebSocket | OpenClaw gateway, Feishu-compatible API |
+| guyu.bot | Internal | Moleculer | Bot account management, message routing |
+| guyu.app | Internal | Moleculer | Application CRUD, secret generation |
+| guyu.integration | Internal | Moleculer | Third-party integration helpers |
 
-![](./website/static/img/intro/roles.png)
+### Message Flow
 
-Visit the official website to learn more: [https://tailchat.msgbyte.com/](https://tailchat.msgbyte.com/)
+1. User sends message in Tailchat → Inbox event triggers
+2. Bot service detects @mention to Guyu bot
+3. Message converted to Feishu event format
+4. Pushed via WebSocket to connected OpenClaw instance
+5. OpenClaw processes and replies
+6. Reply routed back to appropriate Tailchat conversation
+
+## Development
+
+### Local Setup
+
+See [SETUP_GUIDE.md](./SETUP_GUIDE.md) for detailed local development instructions.
+
+### Key Environment Variables
+
+```env
+# Guyu HTTP Service
+GUYU_HTTP_PORT=3080
+
+# OpenClaw Gateway
+OPENCLAW_WS_URL=ws://localhost:3080/open-apis/ws
+```
+
+## Documentation
+
+- [Official Tailchat Docs](https://tailchat.msgbyte.com/)
+- [OpenClaw Documentation](https://openclaw.dev/)
+- [Feishu Bot API Reference](https://open.feishu.cn/document/)
+
+## Try It Online
+
+**Nightly version**: [https://nightly.paw.msgbyte.com/](https://nightly.paw.msgbyte.com/)
+
+> Nightly version is auto-built on every commit. Data reliability not guaranteed - use Docker images or GitHub releases for stable deployments.
 
 ## Quick Deploy
+
 ### Deploy on Sealos
 
 [![Deploy on Sealos](https://raw.githubusercontent.com/labring-actions/templates/main/Deploy-on-Sealos.svg)](https://cloud.sealos.io/?openapp=system-template%3FtemplateName%3Dtailchat)
@@ -77,7 +185,7 @@ Visit the official website to learn more: [https://tailchat.msgbyte.com/](https:
 
 ## Communication
 
-If you are interested in `Tailchat`, welcome to join `Tailchat`'s seed user exchange group, your feedback can help `Tailchat` grow better
+Interested in Tailchat or Guyu? Join our community!
 
 ### Tailchat
 
