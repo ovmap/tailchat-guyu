@@ -198,7 +198,7 @@ OPENCLAW_WS_URL=ws://localhost:3080/open-apis/ws
 
 ### 微信
 
-<img width="360" src="./website/static/img/wechat.jpg" />
+<img width="360" src="./website/static/img/wechat2.jpg" />
 
 ## 项目活动
 
